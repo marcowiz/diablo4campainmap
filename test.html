@@ -15,7 +15,9 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js" integrity="sha512-aVKKRRi/Q/YV+4mjoKBsE4x3H+BkegoM/em46NNlCqNTmUYADjBbeNefNxYV7giUp0VxICtqdrbqU7iVaeZNXA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    
+    <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
+    <script src="marker_data_us.js"></script>
+
     <script type="text/javascript">
         var layerLookup = {};
 
@@ -41,6 +43,66 @@
             };
             var mapWidth = mapBounds['flMaxX'] - mapBounds['flMinX'];
             var mapHeight = mapBounds['flMaxY'] - mapBounds['flMinY'];
+            var layerLookup = {};
+            var iconLookup = {};
+            var iconFuncLookup = {};
+
+            iconLookup["waypoints"] = {
+            'fixed_icon': 'https://cdn.diablo4.cc/image/d4-map/icons/waypoint.webp',
+            'icon_width': 30,
+            'icon_height': 30,
+            'label': 'Waypoints'
+        };
+        iconLookup["altars"] = {
+            'fixed_icon': 'https://cdn.diablo4.cc/image/d4-map/icons/altar-of-lilith.webp',
+            'icon_width': 30,
+            'icon_height': 30,
+            'label': 'Altars of Lilith'
+        };
+        iconLookup["cellars"] = {
+            'fixed_icon': 'https://cdn.diablo4.cc/image/d4-map/icons/cellar.webp',
+            'icon_width': 30,
+            'icon_height': 30,
+            'label': 'Cellars'
+        };
+        iconLookup["dungeons"] = {
+            'fixed_icon': 'https://cdn.diablo4.cc/image/d4-map/icons/dungeon.webp',
+            'icon_width': 30,
+            'icon_height': 30,
+            'label': 'Dungeons'
+        };
+        iconLookup["strongholds"] = {
+            'fixed_icon': 'https://cdn.diablo4.cc/image/d4-map/icons/stronghold.webp',
+            'icon_width': 30,
+            'icon_height': 30,
+            'label': 'Strongholds'
+        };
+        iconLookup["sidequests"] = {
+            'fixed_icon': 'https://cdn.diablo4.cc/image/d4-map/icons/sidequest.webp',
+            'icon_width': 30,
+            'icon_height': 30,
+            'label': 'Sidequests'
+        };
+        iconLookup["campaignquests"] = {
+            'fixed_icon': 'https://cdn.diablo4.cc/image/d4-map/icons/campaign-quest.webp',
+            'icon_width': 30,
+            'icon_height': 30,
+            'label': 'Campaignquests'
+        };
+        var scaleFactor = 1.0;
+
+        Object.keys(iconLookup).forEach(iconType => {
+            var mapIcon = iconLookup[iconType];
+            var layerMapIcon = window.leaflet.Icon.extend({
+                options: {
+                    iconUrl: mapIcon["fixed_icon"],
+                    iconSize: [mapIcon["icon_width"] * scaleFactor, mapIcon["icon_height"] * scaleFactor],
+                    iconAnchor: [(mapIcon["icon_width"] * scaleFactor) / 2.0, (mapIcon["icon_height"] * scaleFactor) / 2.0],
+                }
+            });
+            iconFuncLookup[iconType] = layerMapIcon;
+        });
+
 
             function rotate(x, y) {
                 var angleInRadians = (45) * (Math.PI / 180);
@@ -63,6 +125,35 @@
                 };
             }
 
+             // Define a function to create custom icons for different types of locations
+             function createCustomIcon(iconUrl, iconSize) {
+                return L.icon({
+                    iconUrl: iconUrl,
+                    iconSize: iconSize
+                });
+            }
+
+            Object.keys(markerData).forEach(iconType => {
+                markerEntrys = markerData[iconType];
+                markerEntrys.forEach((markerEntry) => {
+                    var rotatedPosition = rotate(markerEntry['x'], markerEntry['y']);
+                    var converedPosition = convertFromGameCoords(rotatedPosition['x'], rotatedPosition['y']);
+                    var translatedPosition = map.unproject([(w / 2.0 - converedPosition['x'] + 1250), converedPosition['y'] + 6400], map.getMaxZoom());
+                    var tooltip = markerEntry['name'];
+                    if (markerEntry['reward'] != '') {
+                        tooltip += '<br>' + markerEntry['reward'];
+                    }
+                    var iconUrl = 'https://cdn.diablo4.cc/image/d4-map/icons/' + iconType + '.webp';
+                    var iconSize = [30, 30];
+                    var customIcon = createCustomIcon(iconUrl, iconSize);
+                    var marker = L.marker(translatedPosition, { icon: customIcon }).addTo(map).bindPopup(tooltip);
+                    if (!layerLookup[iconType]) {
+                        layerLookup[iconType] = L.layerGroup([]);
+                    }
+                    marker.addTo(layerLookup[iconType]);
+                });
+            });
+
             var southWest = map.unproject([0, h], map.getMaxZoom());
             var northEast = map.unproject([w, 0], map.getMaxZoom());
             var bounds = new L.LatLngBounds(southWest, northEast);
@@ -81,19 +172,6 @@
 
             var scaleFactor = 1.0;
 
-            Object.keys(iconLookup).forEach(iconType => {
-                var mapIcon = iconLookup[iconType];
-                var layerMapIcon = L.Icon.extend({
-                    options: {
-                        iconUrl: mapIcon["fixed_icon"],
-                        iconSize: [mapIcon["icon_width"] * scaleFactor, mapIcon["icon_height"] * scaleFactor],
-                        iconAnchor: [(mapIcon["icon_width"] * scaleFactor) / 2.0, (mapIcon["icon_height"] * scaleFactor) / 2.0],
-                    }
-                });
-                iconFuncLookup[iconType] = layerMapIcon;
-            });
-
-            var itemList = [];
             Object.keys(markerData).forEach(iconType => {
                 markerEntrys = markerData[iconType];
                 markerEntrys.forEach((markerEntry) => {
@@ -104,71 +182,19 @@
                     if (markerEntry['reward'] != '') {
                         tooltip += '<br>' + markerEntry['reward'];
                     }
-                    itemList.push({ 'position': translatedPosition, 'name': markerEntry['name'], 'tooltip': tooltip });
-                    var marker = L.marker(translatedPosition, { icon: new iconFuncLookup[iconType]() }).bindTooltip(tooltip);
+                    var marker = L.marker(translatedPosition).addTo(map).bindPopup(tooltip);
                     if (!layerLookup[iconType]) {
                         layerLookup[iconType] = L.layerGroup([]);
                     }
                     marker.addTo(layerLookup[iconType]);
                 });
-                iconLookup[iconType]['length'] = markerEntrys.length;
             });
 
-            var layerControl = L.control.layers({}, {}).addTo(map);
-            Object.keys(iconLookup).forEach(iconType => {
-                if (iconType in layerLookup) {
-                    var mapIcon = iconLookup[iconType];
-                    layerControl.addOverlay(layerLookup[iconType], "<span class=\"immortal-map-category-container\"><img class=\"immortal-map-category\" src=\"" + mapIcon["fixed_icon"] + "\" /><span class=\"immortal-map-category-label\">" + mapIcon['label'] + " <span class=\"text-end\">" + mapIcon['length'] + "</span></span></span>");
-                    layerLookup[iconType].addTo(map);
-                }
-            });
+            var layerControl = L.control.layers({}, layerLookup).addTo(map);
+            
+            
 
-            var searchbox = new L.Control.Searchbox({
-                position: 'topright',
-                expand: 'left',
-                iconPath: '/img/search_icon.png',
-            }).addTo(map);
-
-            searchbox.onInput("keyup", function (e) {
-                if (e.keyCode == 13) {
-                    search();
-                } else {
-                    var value = searchbox.getValue();
-                    if (value != "") {
-                        var results = itemList.filter(item => item['name'].toLowerCase().includes(value) || item['tooltip'].toLowerCase().includes(value))
-                        searchbox.setItems(results.map(res => res['name']).slice(0, 5));
-                    } else {
-                        searchbox.clearItems();
-                    }
-                }
-            });
-
-            searchbox.onAutocomplete("click", function (e) {
-                var itemName = e.target.innerText;
-                var foundItem = itemList.filter(item => item['name'] == itemName)[0];
-                if (foundItem) {
-                    map.setView(foundItem['position'], map.getMaxZoom(), {
-                        "animate": true,
-                        "pan": {
-                            "duration": 2
-                        }
-                    });
-                }
-            });
-
-            searchbox.onButton("click", search);
-
-            function search() {
-                var value = searchbox.getValue();
-                if (value != "") {
-                    // Perform search functionality
-                }
-
-                setTimeout(function () {
-                    searchbox.hide();
-                    searchbox.clear();
-                }, 600);
-            }
+            
         });
     </script>
 </body>
