@@ -1,3 +1,5 @@
+import tkinter as tk
+from tkinter import ttk, simpledialog
 import keyboard
 import time
 from datetime import datetime
@@ -107,9 +109,13 @@ xp_per_level = {
 99	:	487038304,
 }
 
-
-# Initialize data storage
-df = pd.DataFrame(columns=['level', 'timestamp', 'xp_rate'])
+# Create or load DataFrame
+try:
+    df = pd.read_csv('dataframe.csv')
+    next_session_id = max(df['session_id']) + 1 if 'session_id' in df.columns else 1
+except FileNotFoundError:
+    df = pd.DataFrame(columns=['run_id', 'session_id', 'level', 'timestamp', 'xp_rate', 'comment', 'session_comment'])
+    next_session_id = 1
 
 # Ask user for initial level and XP
 initial_level = int(input('Enter initial level: '))
@@ -118,9 +124,11 @@ initial_xp = int(input('Enter initial XP within level: '))
 prev_level = initial_level
 prev_xp = initial_xp
 prev_time = datetime.now()
+current_session_id = next_session_id
+next_run_id = len(df)
 
 def level_up(e):
-    global prev_level, prev_xp, prev_time, df
+    global prev_level, prev_xp, prev_time, df, current_session_id, next_run_id
 
     # Calculate elapsed time and XP rate
     now = datetime.now()
@@ -130,20 +138,87 @@ def level_up(e):
     xp_rate = xp_gained / elapsed_time
     xp_ratePerMin = xp_rate / 60
 
-    print(f'Level up! New level: {prev_level+1}, XP rate: {xp_rate:.2f} XP/s, Took you {elapsed_time/60:.2f}1 mins, {xpReqForCurrentLevel} XP required for next level')
+    print(f'Level up! New level: {prev_level+1}, XP rate: {xp_rate:.2f} XP/s, Took you {elapsed_time/60:.2f} mins, {xpReqForCurrentLevel} XP required for next level')
 
     # Store data
-    df = df.append({'level': prev_level+1, 'timestamp': now, 'xp_rate': xp_rate}, ignore_index=True)
+    df = df.append({'run_id': next_run_id, 'session_id': current_session_id, 'level': prev_level+1, 'timestamp': now, 'xp_rate': xp_rate}, ignore_index=True)
     df.to_csv('dataframe.csv', sep=',', index=False, encoding='utf-8')
 
     # Reset for next level
     prev_level += 1
     prev_xp = 0
     prev_time = now
+    next_run_id += 1
 
 # Listen for F1 keypress
 keyboard.on_press_key('f1', level_up)
 
-# Keep the script running
-while True:
-    time.sleep(1)
+def add_comment():
+    global df
+    what_to_comment = simpledialog.askstring('Input', 'Enter "run" to comment on a run, "session" to comment on a session:')
+    if what_to_comment == 'run':
+        run_id = simpledialog.askinteger('Input', 'Enter run ID to comment:')
+        if run_id is not None and run_id < len(df):
+            comment = simpledialog.askstring('Input', 'Enter comment:')
+            df.loc[df['run_id'] == run_id, 'comment'] = comment
+            df.to_csv('dataframe.csv', sep=',', index=False, encoding='utf-8')
+        else:
+            messagebox.showerror('Error', 'Invalid run ID')
+    elif what_to_comment == 'session':
+        session_id = simpledialog.askinteger('Input', 'Enter session ID to comment:')
+        if session_id is not None and session_id in df['session_id'].values:
+            comment = simpledialog.askstring('Input', 'Enter comment:')
+            df.loc[df['session_id'] == session_id, 'session_comment'] = comment
+            df.to_csv('dataframe.csv', sep=',', index=False, encoding='utf-8')
+        else:
+            messagebox.showerror('Error', 'Invalid session ID')
+    else:
+        messagebox.showerror('Error', 'Invalid input')
+
+def display_runs():
+    global df
+    try:
+        session_id = int(listbox.get(listbox.curselection()))
+        session_df = df[df['session_id'] == session_id]
+
+        # Clear current data in table
+        for row in table.get_children():
+            table.delete(row)
+
+        # Add new data
+        for _, row in session_df.iterrows():
+            table.insert('', 'end', values=row.tolist())
+
+    except:
+        messagebox.showerror('Error', 'No session selected')
+
+def edit_comment(event):
+    global df
+    selected_item = table.selection()[0] # Get selected item
+    run_id = table.item(selected_item)['values'][0]
+    new_comment = simpledialog.askstring('Input', 'Enter new comment:')
+    df.loc[df['run_id'] == run_id, 'comment'] = new_comment
+    df.to_csv('dataframe.csv', sep=',', index=False, encoding='utf-8')
+    table.set(selected_item, 'Comment', new_comment)
+
+# GUI
+root = tk.Tk()
+add_comment_button = tk.Button(root, text="Add Comment", command=add_comment)
+add_comment_button.pack()
+listbox = tk.Listbox(root)
+listbox.pack()
+for session_id in df['session_id'].unique():
+    listbox.insert(tk.END, str(session_id))
+display_runs_button = tk.Button(root, text="Display Runs", command=display_runs)
+display_runs_button.pack()
+
+
+# Create table
+cols = ('Run ID', 'Session ID', 'Level', 'Timestamp', 'XP Rate', 'Comment', 'Session Comment')
+table = ttk.Treeview(root, columns=cols, show='headings')
+for col in cols:
+    table.heading(col, text=col)
+table.bind("<Double-1>", edit_comment)
+table.pack()
+
+root.mainloop()
