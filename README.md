@@ -1,4 +1,4 @@
-# diablo4campainmap
+# diablo4campainmap now xp calc
 i try to create a diablo 4 map with the path the campain takes marked on it
 
 later i said fuck that, i cant do it. 
