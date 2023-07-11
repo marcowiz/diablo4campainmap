@@ -205,13 +205,18 @@ def edit_comment(event):
 root = tk.Tk()
 add_comment_button = tk.Button(root, text="Add Comment", command=add_comment)
 add_comment_button.pack()
+
+# Maintain Listbox for session selection
 listbox = tk.Listbox(root)
 listbox.pack()
+
+# Populate listbox with session ids
 for session_id in df['session_id'].unique():
     listbox.insert(tk.END, str(session_id))
+
+# Button to display selected session's runs
 display_runs_button = tk.Button(root, text="Display Runs", command=display_runs)
 display_runs_button.pack()
-
 
 # Create table
 cols = ('Run ID', 'Session ID', 'Level', 'Timestamp', 'XP Rate', 'Comment', 'Session Comment')
